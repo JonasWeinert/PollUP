@@ -7,13 +7,12 @@
     "dev": "npm-run-all --parallel dev:frontend dev:backend",
     "dev:frontend": "vite --open",
     "dev:backend": "convex dev",
-    "build": "npx convex deploy --cmd 'npm run build'",
-    "build:local": "vite build",
+    "build": "vite build",
     "lint": "tsc -p convex -noEmit --pretty false && tsc -p . -noEmit --pretty false && convex dev --once && vite build",
     "deploy": "./deploy.sh",
     "redeploy": "./redeploy.sh",
     "deploy:backend": "npx convex deploy",
-    "deploy:frontend": "npm run build:local && vercel --prod"
+    "deploy:frontend": "npm run build && vercel --prod"
   }, 
   "dependencies": {
     "@convex-dev/auth": "^0.0.80",
