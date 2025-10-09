@@ -501,7 +501,7 @@ export function TermsOfUse() {
                 <li>
                   <strong className="font-semibold">GitHub Issues:</strong>{" "}
                   <a
-                    href="https://github.com/yourusername/pollup/issues"
+                    href="https://github.com/JonasWeinert/PollUP/issues"
                     className="text-blue-600 hover:text-blue-700"
                   >
                     Report an issue
