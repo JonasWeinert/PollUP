@@ -52,6 +52,7 @@ coverage
 prod-keys.txt
 prod-keys-fixed.txt
 generateKeys.mjs
+.github-secrets.txt
 
 # OS
 Thumbs.db
