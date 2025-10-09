@@ -189,6 +189,12 @@ export function ParticipantView() {
   const allElementsResponded = activeElements.every(e => respondedElementIds.has(e._id));
 
   if (isCompleted || allElementsResponded) {
+    const handleEditResponses = () => {
+      setIsCompleted(false);
+      setCurrentElementIndex(0);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-2xl mx-auto px-4">
@@ -211,10 +217,30 @@ export function ParticipantView() {
               </p>
             )}
             {session.completionDescription && (
-              <p className="text-gray-600">
+              <p className="text-gray-600 mb-6">
                 <TextWithLinks text={session.completionDescription} />
               </p>
             )}
+            
+            {/* Edit Responses Button */}
+            <div className="mb-6">
+              <button
+                onClick={handleEditResponses}
+                className="px-6 py-3 text-white rounded-lg transition-colors font-medium shadow-md hover:shadow-lg"
+                style={{ 
+                  backgroundColor: accentColor,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.filter = 'brightness(0.9)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.filter = 'brightness(1)';
+                }}
+              >
+                Edit Your Responses
+              </button>
+            </div>
+
             <div className="mt-8 pt-6 border-t border-gray-200">
               <p className="text-sm text-gray-600 mb-3">Want to create your own interactive polls?</p>
               <a
