@@ -36,6 +36,7 @@ export function ParticipantView() {
   const [participantId, setParticipantId] = useState("");
   const [currentElementIndex, setCurrentElementIndex] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [inputCode, setInputCode] = useState("");
 
   useEffect(() => {
@@ -188,8 +189,12 @@ export function ParticipantView() {
   const respondedElementIds = new Set(participantResponses.map(r => r.elementId));
   const allElementsResponded = activeElements.every(e => respondedElementIds.has(e._id));
 
-  if (isCompleted || allElementsResponded) {
+  // Show completion screen if completed OR if all responded (unless user is actively editing)
+  const shouldShowCompletion = (isCompleted || allElementsResponded) && !isEditing;
+
+  if (shouldShowCompletion) {
     const handleEditResponses = () => {
+      setIsEditing(true);
       setIsCompleted(false);
       setCurrentElementIndex(0);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -278,6 +283,7 @@ export function ParticipantView() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       setIsCompleted(true);
+      setIsEditing(false); // Reset editing mode to show completion screen
     }
   };
 
