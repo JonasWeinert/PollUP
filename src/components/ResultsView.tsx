@@ -383,19 +383,52 @@ function ElementResults({ element, responses, totalParticipants, accentColor }: 
       {element.type === "file_upload" && (
         <div className="space-y-2">
           <p className="text-sm font-medium text-gray-700">Uploaded Files:</p>
-          {responses.filter(r => r.fileUrl).map((response, index) => (
-            <div key={index} className="p-3 bg-gray-50 rounded-lg">
-              <a
-                href={response.fileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:underline text-sm"
-                style={{ color: accentColor }}
-              >
-                File {index + 1}
-              </a>
-            </div>
-          ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {responses.filter(r => r.fileUrl).map((response, index) => {
+              const isImage = response.fileUrl && /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(response.fileUrl);
+              
+              return (
+                <div key={index} className="bg-gray-50 rounded-lg overflow-hidden border border-gray-200">
+                  {isImage ? (
+                    <a
+                      href={response.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block group"
+                    >
+                      <div className="relative aspect-video bg-gray-100">
+                        <img
+                          src={response.fileUrl}
+                          alt={`Upload ${index + 1}`}
+                          className="w-full h-full object-contain group-hover:opacity-90 transition-opacity"
+                        />
+                      </div>
+                      <div className="p-2 text-center">
+                        <span 
+                          className="text-xs font-medium hover:underline"
+                          style={{ color: accentColor }}
+                        >
+                          View Full Size
+                        </span>
+                      </div>
+                    </a>
+                  ) : (
+                    <div className="p-3">
+                      <a
+                        href={response.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline text-sm"
+                        style={{ color: accentColor }}
+                      >
+                        File {index + 1}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
           {responses.filter(r => r.fileUrl).length === 0 && (
             <p className="text-gray-500 text-sm">No files uploaded yet</p>
           )}
