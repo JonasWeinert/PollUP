@@ -81,7 +81,7 @@ export function EditSessionModal({ session, onClose }: EditSessionModalProps) {
   return (
     <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-end" onClick={onClose}>
       <div 
-        className="bg-white w-full h-full md:max-w-2xl md:h-full overflow-y-auto shadow-2xl animate-in slide-in-from-right duration-300"
+        className="bg-white w-full h-screen md:max-w-2xl overflow-y-auto shadow-2xl animate-in slide-in-from-right duration-300"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-6 sm:px-8 py-5 flex items-center justify-between z-10">

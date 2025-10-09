@@ -10,6 +10,9 @@ export function ResultsView() {
   const [showPinInput, setShowPinInput] = useState(false);
   const [pinError, setPinError] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showParticipantManager, setShowParticipantManager] = useState(false);
+  const [participantToDelete, setParticipantToDelete] = useState<string | null>(null);
+  const [imageModalUrl, setImageModalUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -46,7 +49,13 @@ export function ResultsView() {
     session ? { sessionId: session._id } : "skip"
   );
 
+  const participants = useQuery(
+    api.responses.getSessionParticipants,
+    session && isOwner ? { sessionId: session._id } : "skip"
+  );
+
   const deleteAllResponses = useMutation(api.responses.deleteAllSessionResponses);
+  const deleteParticipantResponses = useMutation(api.responses.deleteParticipantResponses);
 
   // Get custom colors with defaults
   const bgColor = session?.bgColor || "#f9fafb";
@@ -75,6 +84,18 @@ export function ResultsView() {
       setShowPinInput(true);
     }
   }, [session]);
+
+  // Handle escape key to close image modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && imageModalUrl) {
+        setImageModalUrl(null);
+      }
+    };
+    
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [imageModalUrl]);
 
   const handleExportCSV = () => {
     if (!session || !elements || !responses) return;
@@ -144,6 +165,19 @@ export function ResultsView() {
       setShowDeleteConfirm(false);
     } catch (error) {
       toast.error("Failed to delete responses");
+      console.error(error);
+    }
+  };
+
+  const handleDeleteParticipant = async (participantId: string) => {
+    if (!session) return;
+    
+    try {
+      await deleteParticipantResponses({ sessionId: session._id, participantId });
+      toast.success("Participant responses deleted successfully");
+      setParticipantToDelete(null);
+    } catch (error) {
+      toast.error("Failed to delete participant responses");
       console.error(error);
     }
   };
@@ -258,7 +292,7 @@ export function ResultsView() {
           
           {/* Owner Actions */}
           {isOwner && (
-            <div className="flex justify-center gap-3 mt-6">
+            <div className="flex justify-center gap-3 mt-6 flex-wrap">
               <button
                 onClick={handleExportCSV}
                 className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm flex items-center gap-2"
@@ -267,6 +301,15 @@ export function ResultsView() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 Export CSV
+              </button>
+              <button
+                onClick={() => setShowParticipantManager(true)}
+                className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                Manage Participants
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(true)}
@@ -294,6 +337,7 @@ export function ResultsView() {
                 responses={responses.filter(r => r.elementId === element._id)}
                 totalParticipants={totalParticipants}
                 accentColor={accentColor}
+                onImageClick={setImageModalUrl}
               />
             ))}
           </div>
@@ -325,7 +369,7 @@ export function ResultsView() {
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete All Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
@@ -362,6 +406,143 @@ export function ResultsView() {
           </div>
         </div>
       )}
+
+      {/* Participant Manager Modal */}
+      {showParticipantManager && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-xl font-semibold text-gray-900">
+                Manage Participants
+              </h3>
+              <button
+                onClick={() => setShowParticipantManager(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6">
+              {participants && participants.length > 0 ? (
+                <div className="space-y-2">
+                  {participants.map((participant, index) => (
+                    <div
+                      key={participant.participantId}
+                      className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
+                    >
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900">
+                          Participant #{index + 1}
+                        </div>
+                        <div className="text-sm text-gray-600 mt-1">
+                          {participant.responseCount} response{participant.responseCount !== 1 ? 's' : ''} • 
+                          Joined {new Date(participant.firstResponseTime).toLocaleString()}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setParticipantToDelete(participant.participantId)}
+                        className="ml-4 px-3 py-2 bg-red-50 border border-red-200 text-red-700 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  No participants yet
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowParticipantManager(false)}
+                className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Participant Confirmation Modal */}
+      {participantToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Delete Participant?
+                </h3>
+                <p className="text-sm text-gray-600">
+                  This will permanently delete all responses from this participant. 
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setParticipantToDelete(null)}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteParticipant(participantToDelete)}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+              >
+                Delete Participant
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full Screen Image Modal */}
+      {imageModalUrl && (
+        <div 
+          className="fixed inset-0 bg-black/95 flex items-center justify-center z-[70] p-4"
+          onClick={() => setImageModalUrl(null)}
+        >
+          <button
+            onClick={() => setImageModalUrl(null)}
+            className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors bg-black/50 rounded-full p-2"
+            aria-label="Close"
+          >
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <div 
+            className="max-w-[95vw] max-h-[95vh] flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={imageModalUrl}
+              alt="Full size"
+              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+            />
+          </div>
+          <div className="absolute bottom-4 left-0 right-0 text-center">
+            <p className="text-white text-sm bg-black/50 inline-block px-4 py-2 rounded-full">
+              Click anywhere or press ESC to close
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -371,9 +552,10 @@ interface ElementResultsProps {
   responses: any[];
   totalParticipants: number;
   accentColor: string;
+  onImageClick: (url: string) => void;
 }
 
-function ElementResults({ element, responses, totalParticipants, accentColor }: ElementResultsProps) {
+function ElementResults({ element, responses, totalParticipants, accentColor, onImageClick }: ElementResultsProps) {
   const getChoiceStats = () => {
     if (!element.choices) return {};
     
@@ -428,11 +610,21 @@ function ElementResults({ element, responses, totalParticipants, accentColor }: 
 
       {element.imageUrl && (
         <div className="mb-6 flex justify-center">
-          <img
-            src={element.imageUrl}
-            alt="Element image"
-            className="max-w-md max-h-64 object-contain rounded-lg"
-          />
+          <button
+            onClick={() => onImageClick(element.imageUrl)}
+            className="relative group cursor-pointer"
+          >
+            <img
+              src={element.imageUrl}
+              alt="Element image"
+              className="max-w-md max-h-64 object-contain rounded-lg group-hover:opacity-90 transition-opacity"
+            />
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-lg">
+              <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+              </svg>
+            </div>
+          </button>
         </div>
       )}
 
@@ -449,13 +641,16 @@ function ElementResults({ element, responses, totalParticipants, accentColor }: 
                 className={`flex items-center gap-4 p-3 rounded-lg ${isCorrect ? 'bg-green-50 border-2 border-green-300' : 'bg-white'}`}
               >
                 {choice.imageUrl && (
-                  <div className="w-12 h-12 flex-shrink-0 bg-gray-50 rounded overflow-hidden flex items-center justify-center">
+                  <button
+                    onClick={() => onImageClick(choice.imageUrl)}
+                    className="w-12 h-12 flex-shrink-0 bg-gray-50 rounded overflow-hidden flex items-center justify-center group cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all"
+                  >
                     <img
                       src={choice.imageUrl}
                       alt="Choice image"
-                      className="w-full h-full object-contain"
+                      className="w-full h-full object-contain group-hover:opacity-80 transition-opacity"
                     />
-                  </div>
+                  </button>
                 )}
                 <div className="flex-1">
                   <div className="flex justify-between items-center mb-1">
@@ -528,16 +723,15 @@ function ElementResults({ element, responses, totalParticipants, accentColor }: 
           <p className="text-sm font-medium text-gray-700">Uploaded Files:</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {responses.filter(r => r.fileUrl).map((response, index) => {
-              const isImage = response.fileUrl && /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(response.fileUrl);
+              // Check if file is an image based on content type
+              const isImage = response.fileContentType && response.fileContentType.startsWith('image/');
               
               return (
                 <div key={index} className="bg-gray-50 rounded-lg overflow-hidden border border-gray-200">
                   {isImage ? (
-                    <a
-                      href={response.fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block group"
+                    <button
+                      onClick={() => onImageClick(response.fileUrl)}
+                      className="block group w-full text-left cursor-pointer"
                     >
                       <div className="relative aspect-video bg-gray-100">
                         <img
@@ -545,16 +739,21 @@ function ElementResults({ element, responses, totalParticipants, accentColor }: 
                           alt={`Upload ${index + 1}`}
                           className="w-full h-full object-contain group-hover:opacity-90 transition-opacity"
                         />
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
+                          <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                          </svg>
+                        </div>
                       </div>
                       <div className="p-2 text-center">
                         <span 
                           className="text-xs font-medium hover:underline"
                           style={{ color: accentColor }}
                         >
-                          View Full Size
+                          Click to View Full Size
                         </span>
                       </div>
-                    </a>
+                    </button>
                   ) : (
                     <div className="p-3">
                       <a
@@ -564,7 +763,12 @@ function ElementResults({ element, responses, totalParticipants, accentColor }: 
                         className="hover:underline text-sm"
                         style={{ color: accentColor }}
                       >
-                        File {index + 1}
+                        📎 File {index + 1}
+                        {response.fileContentType && (
+                          <span className="block text-xs text-gray-500 mt-1">
+                            {response.fileContentType}
+                          </span>
+                        )}
                       </a>
                     </div>
                   )}

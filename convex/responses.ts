@@ -98,12 +98,24 @@ export const getSessionResponses = query({
       .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
       .collect();
 
-    // Get file URLs for file responses
+    // Get file URLs and metadata for file responses
     const responsesWithFiles = await Promise.all(
-      responses.map(async (response) => ({
-        ...response,
-        fileUrl: response.fileId ? await ctx.storage.getUrl(response.fileId) : null,
-      }))
+      responses.map(async (response) => {
+        let fileUrl = null;
+        let fileContentType = null;
+        
+        if (response.fileId) {
+          fileUrl = await ctx.storage.getUrl(response.fileId);
+          const metadata = await ctx.db.system.get(response.fileId);
+          fileContentType = metadata?.contentType || null;
+        }
+        
+        return {
+          ...response,
+          fileUrl,
+          fileContentType,
+        };
+      })
     );
 
     return responsesWithFiles;
@@ -199,5 +211,79 @@ export const deleteAllSessionResponses = mutation({
     }
 
     return null;
+  },
+});
+
+export const deleteParticipantResponses = mutation({
+  args: { 
+    sessionId: v.id("sessions"),
+    participantId: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Must be logged in");
+    }
+
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.teacherId !== userId) {
+      throw new Error("Session not found or unauthorized");
+    }
+
+    // Find all responses from this participant in this session
+    const responses = await ctx.db
+      .query("responses")
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .filter((q) => q.eq(q.field("participantId"), args.participantId))
+      .collect();
+
+    for (const response of responses) {
+      await ctx.db.delete(response._id);
+    }
+
+    return null;
+  },
+});
+
+export const getSessionParticipants = query({
+  args: { sessionId: v.id("sessions") },
+  returns: v.array(v.object({
+    participantId: v.string(),
+    responseCount: v.number(),
+    firstResponseTime: v.number(),
+  })),
+  handler: async (ctx, args) => {
+    const responses = await ctx.db
+      .query("responses")
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .collect();
+
+    // Group by participant
+    const participantMap = new Map<string, { count: number; firstTime: number }>();
+    
+    responses.forEach(response => {
+      const existing = participantMap.get(response.participantId);
+      if (existing) {
+        existing.count++;
+        existing.firstTime = Math.min(existing.firstTime, response._creationTime);
+      } else {
+        participantMap.set(response.participantId, {
+          count: 1,
+          firstTime: response._creationTime,
+        });
+      }
+    });
+
+    // Convert to array and sort by first response time
+    const participants = Array.from(participantMap.entries()).map(([participantId, data]) => ({
+      participantId,
+      responseCount: data.count,
+      firstResponseTime: data.firstTime,
+    }));
+
+    participants.sort((a, b) => a.firstResponseTime - b.firstResponseTime);
+
+    return participants;
   },
 });
