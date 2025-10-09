@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { toast } from "sonner";
 
 export function ResultsView() {
   const [sessionCode, setSessionCode] = useState("");
@@ -8,6 +9,7 @@ export function ResultsView() {
   const [accessGranted, setAccessGranted] = useState(false);
   const [showPinInput, setShowPinInput] = useState(false);
   const [pinError, setPinError] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -39,6 +41,13 @@ export function ResultsView() {
     session && accessGranted ? { sessionId: session._id } : "skip"
   ) || [];
 
+  const isOwner = useQuery(
+    api.responses.checkSessionOwnership,
+    session ? { sessionId: session._id } : "skip"
+  );
+
+  const deleteAllResponses = useMutation(api.responses.deleteAllSessionResponses);
+
   // Get custom colors with defaults
   const bgColor = session?.bgColor || "#f9fafb";
   const accentColor = session?.accentColor || "#2563eb";
@@ -66,6 +75,78 @@ export function ResultsView() {
       setShowPinInput(true);
     }
   }, [session]);
+
+  const handleExportCSV = () => {
+    if (!session || !elements || !responses) return;
+
+    // Create CSV header
+    const headers = ["Participant ID", "Element", "Element Type", "Response", "File URL"];
+    const rows = [headers];
+
+    // Group responses by participant
+    const participantIds = new Set(responses.map(r => r.participantId));
+    
+    participantIds.forEach(participantId => {
+      elements.forEach(element => {
+        const response = responses.find(r => r.participantId === participantId && r.elementId === element._id);
+        
+        if (response) {
+          let responseValue = "";
+          
+          if (response.textValue) {
+            responseValue = `"${response.textValue.replace(/"/g, '""')}"`;
+          } else if (response.numberValue !== undefined) {
+            responseValue = response.numberValue.toString();
+          } else if (response.choiceIds && response.choiceIds.length > 0) {
+            const choiceTexts = response.choiceIds.map((choiceId: string) => {
+              const choice = element.choices?.find((c: any) => c.id === choiceId);
+              return choice?.text || choiceId;
+            });
+            responseValue = `"${choiceTexts.join(", ")}"`;
+          } else if (response.fileUrl) {
+            responseValue = "File uploaded";
+          }
+
+          rows.push([
+            participantId,
+            `"${element.title.replace(/"/g, '""')}"`,
+            element.type,
+            responseValue,
+            response.fileUrl || ""
+          ]);
+        }
+      });
+    });
+
+    // Convert to CSV string
+    const csv = rows.map(row => row.join(",")).join("\n");
+
+    // Download
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${session.title.replace(/[^a-z0-9]/gi, '_')}_results_${sessionCode}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast.success("Results exported successfully");
+  };
+
+  const handleDeleteResponses = async () => {
+    if (!session) return;
+    
+    try {
+      await deleteAllResponses({ sessionId: session._id });
+      toast.success("All responses deleted successfully");
+      setShowDeleteConfirm(false);
+    } catch (error) {
+      toast.error("Failed to delete responses");
+      console.error(error);
+    }
+  };
 
   if (!sessionCode) {
     return (
@@ -155,7 +236,7 @@ export function ResultsView() {
           {session.description && (
             <p className="text-gray-600">{session.description}</p>
           )}
-          <div className="flex justify-center gap-4 mt-4 text-sm">
+          <div className="flex justify-center gap-4 mt-4 text-sm flex-wrap">
             <span 
               className="px-3 py-1 rounded-full"
               style={{ 
@@ -174,6 +255,30 @@ export function ResultsView() {
               </span>
             )}
           </div>
+          
+          {/* Owner Actions */}
+          {isOwner && (
+            <div className="flex justify-center gap-3 mt-6">
+              <button
+                onClick={handleExportCSV}
+                className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export CSV
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="px-4 py-2 bg-red-50 border border-red-300 text-red-700 rounded-lg hover:bg-red-100 transition-colors font-medium text-sm flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Delete All Responses
+              </button>
+            </div>
+          )}
         </div>
 
         {elements.length === 0 ? (
@@ -219,6 +324,44 @@ export function ResultsView() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Delete All Responses?
+                </h3>
+                <p className="text-sm text-gray-600">
+                  This will permanently delete all {responses.length} response(s) from {totalParticipants} participant(s). 
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteResponses}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+              >
+                Delete All Responses
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

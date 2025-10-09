@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { getAuthUserId } from "@convex-dev/auth/server";
 
 export const submitResponse = mutation({
   args: {
@@ -153,5 +154,50 @@ export const getTakenChoices = query({
     });
 
     return takenChoices;
+  },
+});
+
+export const checkSessionOwnership = query({
+  args: { sessionId: v.id("sessions") },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return false;
+    }
+
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) {
+      return false;
+    }
+
+    return session.teacherId === userId;
+  },
+});
+
+export const deleteAllSessionResponses = mutation({
+  args: { sessionId: v.id("sessions") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Must be logged in");
+    }
+
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.teacherId !== userId) {
+      throw new Error("Session not found or unauthorized");
+    }
+
+    const responses = await ctx.db
+      .query("responses")
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .collect();
+
+    for (const response of responses) {
+      await ctx.db.delete(response._id);
+    }
+
+    return null;
   },
 });
