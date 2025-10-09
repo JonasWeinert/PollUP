@@ -381,6 +381,7 @@ function ElementResponse({
   const [numberValue, setNumberValue] = useState(element.minValue || 0);
   const [selectedChoices, setSelectedChoices] = useState<string[]>([]);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [existingFileId, setExistingFileId] = useState<Id<"_storage"> | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmittedThisSession, setHasSubmittedThisSession] = useState(hasResponded);
 
@@ -399,12 +400,19 @@ function ElementResponse({
     { sessionId, participantId }
   ) || [];
 
+  // Get file metadata for existing file upload
+  const existingFileMetadata = useQuery(
+    api.responses.getFileMetadata,
+    existingFileId ? { fileId: existingFileId } : "skip"
+  );
+
   // Reset state when element changes
   useEffect(() => {
     setTextValue("");
     setNumberValue(element.minValue || 0);
     setSelectedChoices([]);
     setUploadedFile(null);
+    setExistingFileId(null);
     setHasSubmittedThisSession(false);
   }, [element._id]);
 
@@ -415,6 +423,7 @@ function ElementResponse({
       if (existingResponse.textValue) setTextValue(existingResponse.textValue);
       if (existingResponse.numberValue !== undefined) setNumberValue(existingResponse.numberValue);
       if (existingResponse.choiceIds) setSelectedChoices(existingResponse.choiceIds);
+      if (existingResponse.fileId) setExistingFileId(existingResponse.fileId);
       setHasSubmittedThisSession(true);
     }
   }, [existingResponses, element._id]);
@@ -424,18 +433,24 @@ function ElementResponse({
     try {
       let fileId: Id<"_storage"> | undefined;
       
-      if (element.type === "file_upload" && uploadedFile) {
-        const uploadUrl = await generateUploadUrl();
-        const result = await fetch(uploadUrl, {
-          method: "POST",
-          headers: { "Content-Type": uploadedFile.type },
-          body: uploadedFile,
-        });
-        const json = await result.json();
-        if (!result.ok) {
-          throw new Error(`Upload failed: ${JSON.stringify(json)}`);
+      if (element.type === "file_upload") {
+        if (uploadedFile) {
+          // Upload new file
+          const uploadUrl = await generateUploadUrl();
+          const result = await fetch(uploadUrl, {
+            method: "POST",
+            headers: { "Content-Type": uploadedFile.type },
+            body: uploadedFile,
+          });
+          const json = await result.json();
+          if (!result.ok) {
+            throw new Error(`Upload failed: ${JSON.stringify(json)}`);
+          }
+          fileId = json.storageId;
+        } else if (existingFileId) {
+          // Keep existing file if no new file uploaded
+          fileId = existingFileId;
         }
-        fileId = json.storageId;
       }
 
       await submitResponse({
@@ -470,7 +485,7 @@ function ElementResponse({
       case "multiple_choice":
         return selectedChoices.length > 0;
       case "file_upload":
-        return uploadedFile !== null || hasSubmittedThisSession;
+        return uploadedFile !== null || existingFileId !== null;
       default:
         return false;
     }
@@ -667,13 +682,40 @@ function ElementResponse({
 
         {element.type === "file_upload" && (
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <input
-              type="file"
-              onChange={(e) => setUploadedFile(e.target.files?.[0] || null)}
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent"
-            />
+            {existingFileMetadata && !uploadedFile && (
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm font-semibold text-blue-900 mb-1">Previously uploaded file:</p>
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="text-sm text-blue-800">
+                      {existingFileMetadata.contentType || "File"}
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      Size: {(existingFileMetadata.size / 1024).toFixed(2)} KB
+                    </p>
+                  </div>
+                  <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {existingFileMetadata && !uploadedFile ? "Upload a new file (optional)" : "Upload a file"}
+              </label>
+              <input
+                type="file"
+                onChange={(e) => setUploadedFile(e.target.files?.[0] || null)}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent"
+              />
+            </div>
             {uploadedFile && (
-              <p className="mt-3 text-sm text-gray-600 font-medium">Selected: {uploadedFile.name}</p>
+              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-800 font-medium">
+                  New file selected: {uploadedFile.name}
+                </p>
+              </div>
             )}
           </div>
         )}

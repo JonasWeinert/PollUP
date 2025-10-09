@@ -287,3 +287,20 @@ export const getSessionParticipants = query({
     return participants;
   },
 });
+
+export const getFileMetadata = query({
+  args: { fileId: v.id("_storage") },
+  returns: v.union(
+    v.object({
+      _id: v.id("_storage"),
+      _creationTime: v.number(),
+      contentType: v.optional(v.string()),
+      sha256: v.string(),
+      size: v.number(),
+    }),
+    v.null()
+  ),
+  handler: async (ctx, args) => {
+    return await ctx.db.system.get(args.fileId);
+  },
+});
