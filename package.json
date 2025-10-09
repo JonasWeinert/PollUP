@@ -1,7 +1,7 @@
 {
   "name": "flex-template",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "npm-run-all --parallel dev:frontend dev:backend",
@@ -14,7 +14,7 @@
     "redeploy": "./redeploy.sh",
     "deploy:backend": "npx convex deploy",
     "deploy:frontend": "npm run build:local && vercel --prod"
-  },
+  }, 
   "dependencies": {
     "@convex-dev/auth": "^0.0.80",
     "@dnd-kit/core": "^6.3.1",
