@@ -28,30 +28,20 @@ npm run dev
 
 This starts both the frontend (Vite) and backend (Convex) in development mode.
 
-### Deployment Options
+### Deployment
 
-#### Option 1: GitHub CI/CD (Recommended) 🚀
+#### Automatic Deployment (Recommended) 🚀
 
-Automatic deployments on every push to `main`:
+**Setup once:**
+1. Add `CONVEX_DEPLOY_KEY` to your Vercel project settings
+2. Push to GitHub: `git push origin main`
+3. Done! ✅
 
-1. **Quick Setup:**
-   ```bash
-   ./setup-github-cicd.sh
-   ```
+Every push to `main` automatically deploys both Convex and Vercel.
 
-2. **Add GitHub Secrets:**
-   - Go to Repository → Settings → Secrets and variables → Actions
-   - Add: `CONVEX_DEPLOY_KEY`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`
+📖 **Setup guide:** [AUTO_DEPLOY_SETUP.md](./AUTO_DEPLOY_SETUP.md)
 
-3. **Push to Deploy:**
-   ```bash
-   git push origin main
-   ```
-
-📖 **Full guide:** [GITHUB_CI_CD_SETUP.md](./GITHUB_CI_CD_SETUP.md)  
-⚡ **Quick reference:** [QUICK_CICD_REFERENCE.md](./QUICK_CICD_REFERENCE.md)
-
-#### Option 2: Manual Deployment
+#### Manual Deployment
 
 First-time deployment:
 ```bash
@@ -69,7 +59,7 @@ npm run deploy:backend   # Convex only
 npm run deploy:frontend  # Vercel only
 ```
 
-📖 **Full guide:** [DEPLOYMENT.md](./DEPLOYMENT.md)
+📖 **Manual deployment guide:** [DEPLOYMENT.md](./DEPLOYMENT.md)
 
 ### Additional Resources
 
